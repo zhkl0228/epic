@@ -32,7 +32,7 @@ import me.weishu.epic.art.Epic;
 import me.weishu.epic.art.EpicNative;
 
 @SuppressWarnings({"unused", "ConstantConditions"})
-public class Entry64ForM {
+public class Entry64_2 {
 
     private final static String TAG = "Entry64";
 
@@ -482,7 +482,7 @@ public class Entry64ForM {
         } else {
             long address = byteBuffer.getLong();
             Object object = EpicNative.getObject(self, address);
-            Logger.i(TAG, "wrapArgument, address: 0x" + Long.toHexString(address) + ", value:" + object);
+            // Logger.d(TAG, "wrapArgument, address: 0x" + Long.toHexString(address) + ", value:" + object);
             return object;
         }
     }
@@ -513,7 +513,7 @@ public class Entry64ForM {
 
             final String bridgeMethod = bridgeMethodMap.get(returnType.isPrimitive() ? returnType : Object.class);
             Logger.d(TAG, "bridge method:" + bridgeMethod + ", map:" + bridgeMethodMap);
-            Method method = Entry64ForM.class.getDeclaredMethod(bridgeMethod, bridgeParamTypes);
+            Method method = Entry64_2.class.getDeclaredMethod(bridgeMethod, bridgeParamTypes);
             method.setAccessible(true);
             return method;
         } catch (Throwable e) {

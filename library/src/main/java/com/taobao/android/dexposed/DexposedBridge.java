@@ -19,6 +19,7 @@
 
 package com.taobao.android.dexposed;
 
+import android.os.Build;
 import android.util.Log;
 
 import com.taobao.android.dexposed.XC_MethodHook.MethodHookParam;
@@ -48,6 +49,22 @@ import static com.taobao.android.dexposed.XposedHelpers.getIntField;
 
 
 public final class DexposedBridge {
+
+	static {
+		try {
+			if (android.os.Build.VERSION.SDK_INT > Build.VERSION_CODES.KITKAT
+					&& android.os.Build.VERSION.SDK_INT <= Build.VERSION_CODES.O_MR1){
+				System.loadLibrary("epic");
+			} else if (android.os.Build.VERSION.SDK_INT > Build.VERSION_CODES.ICE_CREAM_SANDWICH){
+				System.loadLibrary("dexposed");
+			} else {
+				throw new RuntimeException("unsupported api level: " + Build.VERSION.SDK_INT);
+			}
+
+		} catch (Throwable e) {
+			log(e);
+		}
+	}
 
 	private static final String TAG = "DexposedBridge";
 
@@ -162,7 +179,7 @@ public final class DexposedBridge {
 		
 		XC_MethodHook callback = (XC_MethodHook) parameterTypesAndCallback[parameterTypesAndCallback.length-1];
 		Method m = XposedHelpers.findMethodExact(clazz, methodName, parameterTypesAndCallback);
-		Logger.i(TAG, "findMethod: " + m.toGenericString());
+		Logger.i(TAG, "findAndHookMethod: " + m.toGenericString());
 		Unhook unhook = hookMethod(m, callback);
 		if (!(callback instanceof XC_MethodKeepHook
 				|| callback instanceof XC_MethodKeepReplacement)) {
@@ -190,18 +207,20 @@ public final class DexposedBridge {
 	}
 
 
-	public static Object handleHookedArtMethod(Object artmethod, Object thisObject, Object[] args) {
+	public static Object handleHookedArtMethod(Object artMethodObject, Object thisObject, Object[] args) {
 
 		CopyOnWriteSortedSet<XC_MethodHook> callbacks;
+
+		ArtMethod artmethod = (ArtMethod ) artMethodObject;
 		synchronized (hookedMethodCallbacks) {
-			callbacks = hookedMethodCallbacks.get(((ArtMethod) artmethod).getExecutable());
+			callbacks = hookedMethodCallbacks.get(artmethod.getExecutable());
 		}
 		Object[] callbacksSnapshot = callbacks.getSnapshot();
 		final int callbacksLength = callbacksSnapshot.length;
-		Logger.d(TAG, "callbacksLength:" + callbacksLength);
+		//Logger.d(TAG, "callbacksLength:" + callbacksLength +  ", this:" + thisObject + ", args:" + Arrays.toString(args));
 		if (callbacksLength == 0) {
 			try {
-				ArtMethod method = Epic.getBackMethod((ArtMethod) artmethod);
+				ArtMethod method = Epic.getBackMethod(artmethod);
 				return method.invoke(thisObject, args);
 			} catch (Exception e) {
 				log(e.getCause());
@@ -209,7 +228,7 @@ public final class DexposedBridge {
 		}
 
 		MethodHookParam param = new MethodHookParam();
-		param.method  = (Member) ((ArtMethod) artmethod).getExecutable();
+		param.method  = (Member) (artmethod).getExecutable();
 		param.thisObject = thisObject;
 		param.args = args;
 
@@ -237,8 +256,7 @@ public final class DexposedBridge {
 		// call original method if not requested otherwise
 		if (!param.returnEarly) {
 			try {
-				ArtMethod method = Epic.getBackMethod((ArtMethod) artmethod);
-
+				ArtMethod method = Epic.getBackMethod(artmethod);
 				Object result = method.invoke(thisObject, args);
 				param.setResult(result);
 			} catch (Exception e) {
@@ -266,17 +284,39 @@ public final class DexposedBridge {
 			}
 		} while (--afterIdx >= 0);
 
-		// return
-		Log.w(TAG, "prepare return!!");
 		if (param.hasThrowable()) {
-			// throw new RuntimeException(param.getThrowable());
-			Log.w(TAG, "has throwable!!");
-			 return null;
-		}else {
+			final Throwable throwable = param.getThrowable();
+			if (throwable instanceof IllegalAccessException || throwable instanceof InvocationTargetException
+					|| throwable instanceof InstantiationException) {
+				// reflect exception, get the origin cause
+				final Throwable cause = throwable.getCause();
+
+				// We can not change the exception flow of origin call, rethrow
+				Logger.e(TAG, "origin call throw exception (not a real crash, just record for debug):", cause);
+				DexposedBridge.<RuntimeException>throwNoCheck(param.getThrowable().getCause(), null);
+				return null; //never reach.
+			} else {
+				// the exception cause by epic self, just log.
+				Logger.w(TAG, "epic cause exception in call bridge!!");
+			}
+			return null; // never reached.
+		} else {
 			final Object result = param.getResult();
-			Log.i(TAG, "return :" + result);
+			//Logger.d(TAG, "return :" + result);
 			return result;
 		}
+	}
+
+	/**
+	 * Just for throw an checked exception without check
+	 * @param exception The checked exception.
+	 * @param dummy dummy.
+	 * @param <T> fake type
+	 * @throws T the checked exception.
+	 */
+	@SuppressWarnings("unchecked")
+	private static <T extends Throwable> void throwNoCheck(Throwable exception, Object dummy) throws T {
+		throw (T) exception;
 	}
 
 	/**
@@ -359,47 +399,7 @@ public final class DexposedBridge {
 			return param.getResult();
 	}
 	
-//	/**
-//	 * Check device if can run dexposed, and load libs auto.
-//	 */
-//	public synchronized static boolean canDexposed(Context context) {
-//		if (!DeviceCheck.isDeviceSupport(context)) {
-//			return false;
-//		}
-//		//load dexposed lib for hook.
-//		return loadDexposedLib(context);
-//	}
-//
-//	private static boolean loadDexposedLib(Context context) {
-//		// load dexposed lib for hook.
-//		try {
-//			if (android.os.Build.VERSION.SDK_INT > 19 && android.os.Build.VERSION.SDK_INT <= 23 ){
-//				System.loadLibrary("dexposed_art");
-//			} else if (android.os.Build.VERSION.SDK_INT > 14){
-//				System.loadLibrary("dexposed");
-//			} else {
-//				return false;
-//			}
-//			return true;
-//		} catch (Throwable e) {
-//			return false;
-//		}
-//	}
 
-	static {
-		try {
-			if (android.os.Build.VERSION.SDK_INT > 19 && android.os.Build.VERSION.SDK_INT <= 26 ){
-				System.loadLibrary("epic");
-			} else if (android.os.Build.VERSION.SDK_INT > 14){
-				System.loadLibrary("dexposed");
-			} else {
-
-			}
-
-		} catch (Throwable e) {
-			log(e);
-		}
-	}
 	
 	private native static Object invokeSuperNative(Object obj, Object[] args, Member method, Class<?> declaringClass,
             Class<?>[] parameterTypes, Class<?> returnType, int slot)
@@ -476,6 +476,19 @@ public final class DexposedBridge {
 			throw new IllegalArgumentException("method must be of type Method or Constructor");
 		}
 
+		if (Runtime.isArt()) {
+			ArtMethod artMethod;
+			if (method instanceof Method) {
+				artMethod = ArtMethod.of((Method) method);
+			} else {
+				artMethod = ArtMethod.of((Constructor)method);
+			}
+			try {
+                return Epic.getBackMethod(artMethod).invoke(thisObject, args);
+			} catch (InstantiationException e) {
+                DexposedBridge.<RuntimeException>throwNoCheck(e, null);
+			}
+		}
 		return invokeOriginalMethodNative(method, 0, parameterTypes, returnType, thisObject, args);
 	}
 

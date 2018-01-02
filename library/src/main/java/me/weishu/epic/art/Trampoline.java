@@ -16,9 +16,6 @@
 
 package me.weishu.epic.art;
 
-import android.os.Build;
-import android.util.Log;
-
 import com.taobao.android.dexposed.utility.Debug;
 import com.taobao.android.dexposed.utility.Logger;
 import com.taobao.android.dexposed.utility.Runtime;
@@ -27,8 +24,7 @@ import java.lang.reflect.Method;
 
 import me.weishu.epic.art.arch.ShellCode;
 import me.weishu.epic.art.entry.Entry;
-import me.weishu.epic.art.entry.Entry64;
-import me.weishu.epic.art.entry.Entry64ForM;
+import me.weishu.epic.art.entry.Entry64_2;
 import me.weishu.epic.art.method.ArtMethod;
 
 class Trampoline {
@@ -100,12 +96,12 @@ class Trampoline {
     }
 
     private byte[] create() {
-        Log.i(TAG, "create trampoline.");
+        Logger.d(TAG, "create trampoline.");
         byte[] mainPage = new byte[getSize()];
         int offset = 0;
 
         byte[] script = createTrampoline(artOrigin);
-        Log.i(TAG, "trampoline size:" + script.length);
+        Logger.d(TAG, "trampoline size:" + script.length);
         System.arraycopy(script, 0, mainPage, offset, script.length);
         offset += script.length;
 
@@ -116,42 +112,12 @@ class Trampoline {
     }
 
     private boolean activate() {
-        Logger.d(TAG, "Writing direct jump entry " + Debug.addrHex(getTrampolinePc()) + " to origin entry: 0x" + Debug.addrHex(jumpToAddress));
-        final int sizeOfDirectJump = shellCode.sizeOfDirectJump();
-        boolean isNougat = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N;
-        long cookie = 0;
-        if (isNougat) {
-            // We do thus things:
-            // 1. modify the code mprotect
-            // 2. modify the code
-
-            // Ideal, this two operation must be atomic. Below N, this is safe, because no one
-            // modify the code except ourselves;
-            // But in Android N, When the jit is working, between our step 1 and step 2,
-            // if we modity the mprotect of the code, and planning to write the code,
-            // the jit thread may modify the mprotect of the code meanwhile
-            // we must suspend all thread to ensure the atomic operation.
-            cookie = EpicNative.suspendAll();
+        long pc = getTrampolinePc();
+        Logger.d(TAG, "Writing direct jump entry " + Debug.addrHex(pc) + " to origin entry: 0x" + Debug.addrHex(jumpToAddress));
+        synchronized (Trampoline.class) {
+            return EpicNative.activateNative(jumpToAddress, pc, shellCode.sizeOfDirectJump(),
+                    shellCode.sizeOfBridgeJump(), shellCode.createDirectJump(pc));
         }
-        boolean result = EpicNative.unprotect(jumpToAddress, sizeOfDirectJump);
-        if (result) {
-            EpicNative.put(shellCode.createDirectJump(getTrampolinePc()), jumpToAddress);
-            if (isNougat && cookie != 0) {
-                EpicNative.resumeAll(cookie);
-            }
-            boolean ret = EpicNative.cacheflush(getTrampolinePc(), shellCode.sizeOfBridgeJump());
-            if (!ret) {
-                Logger.w(TAG, "cache flush failed!!");
-            }
-            active = true;
-        } else {
-            if (isNougat && cookie != 0) {
-                EpicNative.resumeAll(cookie);
-            }
-            Log.e(TAG, "Writing hook failed: Unable to unprotect memory at " + Debug.addrHex(jumpToAddress) + "!");
-            active = false;
-        }
-        return active;
     }
 
     @Override
@@ -164,7 +130,9 @@ class Trampoline {
         final Epic.MethodInfo methodInfo = Epic.getMethodInfo(source.getAddress());
         final Class<?> returnType = methodInfo.returnType;
 
-        Method bridgeMethod = Runtime.is64Bit() ? (Build.VERSION.SDK_INT == 23 ? Entry64ForM.getBridgeMethod(methodInfo) : Entry64.getBridgeMethod(returnType))
+//        Method bridgeMethod = Runtime.is64Bit() ? (Build.VERSION.SDK_INT == 23 ? Entry64_2.getBridgeMethod(methodInfo) : Entry64.getBridgeMethod(returnType))
+//                : Entry.getBridgeMethod(returnType);
+        Method bridgeMethod = Runtime.is64Bit() ? Entry64_2.getBridgeMethod(methodInfo)
                 : Entry.getBridgeMethod(returnType);
 
         final ArtMethod target = ArtMethod.of(bridgeMethod);

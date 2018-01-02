@@ -22,7 +22,6 @@ import com.taobao.android.dexposed.utility.Logger;
 
 import java.lang.reflect.Member;
 
-import static com.taobao.android.dexposed.utility.Debug.DEBUG;
 import static com.taobao.android.dexposed.utility.Debug.addrHex;
 
 
@@ -67,6 +66,30 @@ public final class EpicNative {
      */
     public static native void resumeAll(long cookie);
 
+    /**
+     * stop jit compiler in runtime.
+     * Warning: Just for experiment Do not call this now!!!
+     * @return cookie use by {@link #startJit(long)}
+     */
+    public static native long stopJit();
+
+    /**
+     * start jit compiler stop by {@link #stopJit()}
+     * Warning: Just for experiment Do not call this now!!!
+     * @param cookie the cookie return by {@link #stopJit()}
+     */
+    public static native void startJit(long cookie);
+
+    // FIXME: 17/12/29 reimplement it with pure native code.
+    static native boolean activateNative(long jumpToAddress, long pc, long sizeOfTargetJump, long sizeOfBridgeJump, byte[] code);
+
+    /**
+     * Disable the moving gc of runtime.
+     * Warning: Just for experiment Do not call this now!!!
+     * @param api the api level
+     */
+    public static native void disableMovingGc(int api);
+
     private static final String TAG = "EpicNative";
 
     private EpicNative() {
@@ -102,13 +125,9 @@ public final class EpicNative {
     }
 
     public static byte[] get(long src, int length) {
-        if (DEBUG) {
-            Logger.d(TAG, "Reading " + length + " bytes from: " + addrHex(src));
-        }
+        Logger.d(TAG, "Reading " + length + " bytes from: " + addrHex(src));
         byte[] bytes = memget(src, length);
-        if (DEBUG) {
-            Logger.d(TAG, Debug.hexdump(bytes, src));
-        }
+        Logger.d(TAG, Debug.hexdump(bytes, src));
         return bytes;
     }
 

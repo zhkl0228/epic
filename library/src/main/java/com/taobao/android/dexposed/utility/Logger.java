@@ -7,7 +7,7 @@ import android.util.Log;
  */
 public class Logger {
 
-    public static final boolean DEBUG = Debug.DEBUG;
+    private static final boolean DEBUG = Debug.DEBUG;
 
     public static final String preFix = "epic.";
 
@@ -18,8 +18,8 @@ public class Logger {
     }
 
     public static void d(String tagSuffix, String msg) {
-        if (DEBUG){
-            Log.i(preFix + tagSuffix, msg);
+        if (DEBUG) {
+            Log.d(preFix + tagSuffix, msg);
         }
     }
 

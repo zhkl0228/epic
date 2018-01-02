@@ -17,7 +17,6 @@
 package me.weishu.epic.art.entry;
 
 import android.os.Build;
-import android.util.Log;
 import android.util.Pair;
 
 import com.taobao.android.dexposed.DexposedBridge;
@@ -148,7 +147,7 @@ public class Entry {
         Logger.d(TAG, "r3:" + Debug.hexdump(r3, 0));
 
         final int sourceMethod = ByteBuffer.wrap(EpicNative.get(struct + 12, 4)).order(ByteOrder.LITTLE_ENDIAN).getInt();
-        Logger.i(TAG, "sourceMethod:" + Long.toHexString(sourceMethod));
+        Logger.i(TAG, "sourceMethod:" + Integer.toHexString(sourceMethod));
 
         Epic.MethodInfo originMethodInfo = Epic.getMethodInfo(sourceMethod);
         Logger.i(TAG, "originMethodInfo :" + originMethodInfo);
@@ -290,6 +289,12 @@ public class Entry {
                         if (arg1TypeLength == 4 && arg2TypeLength == 8) {
                             isR3Grabbed = false;
                         }
+
+                        if (numberOfArgs == 2 && arg1TypeLength == 8 && arg2TypeLength == 8) {
+                            // in this case, we have no reference register to local r3, just hard code now :(
+                            System.arraycopy(EpicNative.get(sp + 44, 4), 0, argBytes, 12, 4);
+                            isR3Grabbed = false;
+                        }
                     }
                     if (numberOfArgs >= 3) {
                         int arg1TypeLength = getTypeLength(typeOfArgs[0]);
@@ -402,7 +407,7 @@ public class Entry {
     public static Method getBridgeMethod(Class<?> returnType) {
         try {
             final String bridgeMethod = bridgeMethodMap.get(returnType.isPrimitive() ? returnType : Object.class);
-            Log.i(TAG, "bridge method:" + bridgeMethod + ", map:" + bridgeMethodMap);
+            Logger.i(TAG, "bridge method:" + bridgeMethod + ", map:" + bridgeMethodMap);
             Method method = Entry.class.getDeclaredMethod(bridgeMethod, int.class, int.class, int.class);
             method.setAccessible(true);
             return method;
