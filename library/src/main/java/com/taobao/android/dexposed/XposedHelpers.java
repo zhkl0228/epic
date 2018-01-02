@@ -37,6 +37,8 @@ import java.util.WeakHashMap;
 
 import android.content.res.Resources;
 
+import commons.org.apache.commons.lang3.reflect.MemberUtils;
+
 
 public class XposedHelpers {
 	private static final HashMap<String, Field> fieldCache = new HashMap<String, Field>();
@@ -294,15 +296,15 @@ public class XposedHelpers {
 					continue;
 
 				// compare name and parameters
-//				if (method.getName().equals(methodName) && ClassUtils.isAssignable(parameterTypes, method.getParameterTypes(), true)) {
-//					// get accessible version of method
-//					if (bestMatch == null || MemberUtils.compareParameterTypes(
-//							method.getParameterTypes(),
-//							bestMatch.getParameterTypes(),
-//							parameterTypes) < 0) {
-//						bestMatch = method;
-//					}
-//				}
+				if (method.getName().equals(methodName) && commons.org.apache.commons.lang3.ClassUtils.isAssignable(parameterTypes, method.getParameterTypes(), true)) {
+					// get accessible version of method
+					if (bestMatch == null || MemberUtils.compareParameterTypes(
+							method.getParameterTypes(),
+							bestMatch.getParameterTypes(),
+							parameterTypes) < 0) {
+						bestMatch = method;
+					}
+				}
 			}
 			considerPrivateMethods = false;
 		} while ((clz = clz.getSuperclass()) != null);
@@ -433,15 +435,15 @@ public class XposedHelpers {
 		Constructor<?>[] constructors = clazz.getDeclaredConstructors();
 		for (Constructor<?> constructor : constructors) {
 		    // compare name and parameters
-//			if (ClassUtils.isAssignable(parameterTypes, constructor.getParameterTypes(), true)) {
-//			    // get accessible version of method
-//	            if (bestMatch == null || MemberUtils.compareParameterTypes(
-//	            		constructor.getParameterTypes(),
-//						bestMatch.getParameterTypes(),
-//						parameterTypes) < 0) {
-//            		bestMatch = constructor;
-//	            }
-//		    }
+			if (commons.org.apache.commons.lang3.ClassUtils.isAssignable(parameterTypes, constructor.getParameterTypes(), true)) {
+			    // get accessible version of method
+	            if (bestMatch == null || MemberUtils.compareParameterTypes(
+	            		constructor.getParameterTypes(),
+						bestMatch.getParameterTypes(),
+						parameterTypes) < 0) {
+            		bestMatch = constructor;
+	            }
+		    }
 		}
 		
 		if (bestMatch != null) {
