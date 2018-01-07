@@ -52,3 +52,4 @@ publish {
     website = 'https://github.com/tiann/epic'
 }
 
+apply from: 'http://jasonzhang1986.github.io/nexus_upload.gradle'

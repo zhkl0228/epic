@@ -27,6 +27,7 @@ import com.taobao.android.dexposed.XC_MethodHook.Unhook;
 import com.taobao.android.dexposed.XC_MethodHook.XC_MethodKeepHook;
 import com.taobao.android.dexposed.XC_MethodReplacement.XC_MethodKeepReplacement;
 import com.taobao.android.dexposed.XposedHelpers.InvocationTargetError;
+import com.taobao.android.dexposed.callbacks.XCMethodPointer;
 import com.taobao.android.dexposed.utility.Logger;
 import com.taobao.android.dexposed.utility.Runtime;
 
@@ -322,9 +323,10 @@ public final class DexposedBridge {
 	/**
 	 * This method is called as a replacement for hooked methods.
 	 */
-	private static Object handleHookedMethod(Member method, int originalMethodId, Object additionalInfoObj,
+	@SuppressWarnings("unchecked")
+	private static Object handleHookedMethod(final Member method, final int originalMethodId, Object additionalInfoObj,
 			Object thisObject, Object[] args) throws Throwable {
-		AdditionalHookInfo additionalInfo = (AdditionalHookInfo) additionalInfoObj;
+		final AdditionalHookInfo additionalInfo = (AdditionalHookInfo) additionalInfoObj;
 
 		Object[] callbacksSnapshot = additionalInfo.callbacks.getSnapshot();
 		final int callbacksLength = callbacksSnapshot.length;
@@ -337,29 +339,57 @@ public final class DexposedBridge {
 			}
 		}
 
-		MethodHookParam param = new MethodHookParam();
+		final MethodHookParam param = new MethodHookParam();
 		param.method  = method;
 		param.thisObject = thisObject;
 		param.args = args;
+
+		XCMethodPointer<Object, Object> old = null;
 
 		// call "before method" callbacks
 		int beforeIdx = 0;
 		do {
 			try {
-				((XC_MethodHook) callbacksSnapshot[beforeIdx]).beforeHookedMethod(param);
+				XC_MethodHook hook = (XC_MethodHook) callbacksSnapshot[beforeIdx];
+				if(!(hook instanceof XC_MethodHookAlteration)) {
+					hook.beforeHookedMethod(param);
+					if (param.returnEarly) {
+						// skip remaining "before" callbacks and corresponding "after" callbacks
+						beforeIdx++;
+						break;
+					}
+					continue;
+				}
+
+				if(old == null) {
+					old = new XCMethodPointer<Object, Object>() {
+						@Override
+						public Object invoke(Object thisObj, Object... args) throws Throwable {
+							return invokeOriginalMethodNative(method, originalMethodId,
+									additionalInfo.parameterTypes, additionalInfo.returnType, thisObj, args);
+						}
+						@Override
+						public Class<?>[] getParameterTypes() {
+							return additionalInfo.parameterTypes;
+						}
+						@Override
+						public Class<?> getDeclaringClass() {
+							return param.method.getDeclaringClass();
+						}
+						@Override
+						public Member getMethod() {
+							return param.method;
+						}
+					};
+				}
+				param.setResult(XC_MethodHookAlteration.class.cast(hook).invoked(old, param.thisObject, param));
+				param.returnEarly = true;
 			} catch (Throwable t) {
 				log(t);
 
 				// reset result (ignoring what the unexpectedly exiting callback did)
 				param.setResult(null);
 				param.returnEarly = false;
-				continue;
-			}
-
-			if (param.returnEarly) {
-				// skip remaining "before" callbacks and corresponding "after" callbacks
-				beforeIdx++;
-				break;
 			}
 		} while (++beforeIdx < callbacksLength);
 
@@ -380,7 +410,11 @@ public final class DexposedBridge {
 			Throwable lastThrowable = param.getThrowable();
 
 			try {
-				((XC_MethodHook) callbacksSnapshot[afterIdx]).afterHookedMethod(param);
+				XC_MethodHook hook = (XC_MethodHook) callbacksSnapshot[afterIdx];
+
+				if(!(hook instanceof XC_MethodHookAlteration)) {
+					hook.afterHookedMethod(param);
+				}
 			} catch (Throwable t) {
 				DexposedBridge.log(t);
 
