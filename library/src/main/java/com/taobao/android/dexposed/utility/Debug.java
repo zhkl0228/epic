@@ -61,7 +61,7 @@ public final class Debug {
     }
 
     public static String dump(byte[] b, long start) {
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < b.length; i++) {
             if (i % 8 == 0) {
                 sb.append(addrHex(start + i)).append(":");
@@ -77,7 +77,7 @@ public final class Debug {
         if (!DEBUG) {
             return RELASE_WRAN_STRING;
         }
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < bytes.length; i++) {
             if (i % 8 == 0) {
                 sb.append(addrHex(start + i)).append(":");

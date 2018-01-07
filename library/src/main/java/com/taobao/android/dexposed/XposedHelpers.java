@@ -37,8 +37,6 @@ import java.util.WeakHashMap;
 
 import android.content.res.Resources;
 
-import commons.org.apache.commons.lang3.reflect.MemberUtils;
-
 
 public class XposedHelpers {
 	private static final HashMap<String, Field> fieldCache = new HashMap<String, Field>();
@@ -296,7 +294,7 @@ public class XposedHelpers {
 					continue;
 
 				// compare name and parameters
-				if (method.getName().equals(methodName) && commons.org.apache.commons.lang3.ClassUtils.isAssignable(parameterTypes, method.getParameterTypes(), true)) {
+				if (method.getName().equals(methodName) && ClassUtils.isAssignable(parameterTypes, method.getParameterTypes(), true)) {
 					// get accessible version of method
 					if (bestMatch == null || MemberUtils.compareParameterTypes(
 							method.getParameterTypes(),
@@ -413,10 +411,8 @@ public class XposedHelpers {
 	
 
 	public static Constructor<?> findConstructorBestMatch(Class<?> clazz, Class<?>... parameterTypes) {
-		StringBuilder sb = new StringBuilder(clazz.getName());
-		sb.append(getParametersString(parameterTypes));
-		sb.append("#bestmatch");
-		String fullConstructorName = sb.toString();
+		String fullConstructorName = clazz.getName() + getParametersString(parameterTypes) +
+				"#bestmatch";
 		
 		if (constructorCache.containsKey(fullConstructorName)) {
 			Constructor<?> constructor = constructorCache.get(fullConstructorName);
@@ -435,7 +431,7 @@ public class XposedHelpers {
 		Constructor<?>[] constructors = clazz.getDeclaredConstructors();
 		for (Constructor<?> constructor : constructors) {
 		    // compare name and parameters
-			if (commons.org.apache.commons.lang3.ClassUtils.isAssignable(parameterTypes, constructor.getParameterTypes(), true)) {
+			if (ClassUtils.isAssignable(parameterTypes, constructor.getParameterTypes(), true)) {
 			    // get accessible version of method
 	            if (bestMatch == null || MemberUtils.compareParameterTypes(
 	            		constructor.getParameterTypes(),
