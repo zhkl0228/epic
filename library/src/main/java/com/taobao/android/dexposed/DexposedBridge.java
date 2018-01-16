@@ -119,33 +119,32 @@ public final class DexposedBridge {
 			}
 		}
 
+		Logger.w(TAG, "hook: " + hookMethod + ", newMethod ? " + newMethod);
+
 		callbacks.add(callback);
 		if (newMethod) {
-			Class<?> declaringClass = hookMethod.getDeclaringClass();
-			int slot = !Runtime.isArt() ? (int) getIntField(hookMethod, "slot") : 0;
-
-			Class<?>[] parameterTypes;
-			Class<?> returnType;
-			boolean isMethod = false;
-			if (hookMethod instanceof Method) {
-				parameterTypes = ((Method) hookMethod).getParameterTypes();
-				returnType = ((Method) hookMethod).getReturnType();
-				isMethod = true;
-			} else {
-				parameterTypes = ((Constructor<?>) hookMethod).getParameterTypes();
-				returnType = null;
-			}
-
-			AdditionalHookInfo additionalInfo = new AdditionalHookInfo(callbacks, parameterTypes, returnType);
-
-			if(!Runtime.isArt())
-				hookMethodNative(hookMethod, declaringClass, slot, additionalInfo);
-			else {
-				if (isMethod) {
+			if (Runtime.isArt()) {
+				if (hookMethod instanceof Method) {
 					Epic.hookMethod(((Method) hookMethod));
 				} else {
 					Epic.hookMethod(((Constructor) hookMethod));
 				}
+			} else {
+				Class<?> declaringClass = hookMethod.getDeclaringClass();
+				int slot = getIntField(hookMethod, "slot");
+
+				Class<?>[] parameterTypes;
+				Class<?> returnType;
+				if (hookMethod instanceof Method) {
+					parameterTypes = ((Method) hookMethod).getParameterTypes();
+					returnType = ((Method) hookMethod).getReturnType();
+				} else {
+					parameterTypes = ((Constructor<?>) hookMethod).getParameterTypes();
+					returnType = null;
+				}
+
+				AdditionalHookInfo additionalInfo = new AdditionalHookInfo(callbacks, parameterTypes, returnType);
+				hookMethodNative(hookMethod, declaringClass, slot, additionalInfo);
 			}
 		}
 		return callback.new Unhook(hookMethod);
@@ -180,7 +179,6 @@ public final class DexposedBridge {
 		
 		XC_MethodHook callback = (XC_MethodHook) parameterTypesAndCallback[parameterTypesAndCallback.length-1];
 		Method m = XposedHelpers.findMethodExact(clazz, methodName, parameterTypesAndCallback);
-		Logger.i(TAG, "findAndHookMethod: " + m.toGenericString());
 		Unhook unhook = hookMethod(m, callback);
 		if (!(callback instanceof XC_MethodKeepHook
 				|| callback instanceof XC_MethodKeepReplacement)) {
@@ -261,7 +259,7 @@ public final class DexposedBridge {
 				Object result = method.invoke(thisObject, args);
 				param.setResult(result);
 			} catch (Exception e) {
-				log(e);
+				// log(e); origin throw exception is normal.
 				param.setThrowable(e);
 			}
 		}
@@ -293,12 +291,12 @@ public final class DexposedBridge {
 				final Throwable cause = throwable.getCause();
 
 				// We can not change the exception flow of origin call, rethrow
-				Logger.e(TAG, "origin call throw exception (not a real crash, just record for debug):", cause);
+				// Logger.e(TAG, "origin call throw exception (not a real crash, just record for debug):", cause);
 				DexposedBridge.<RuntimeException>throwNoCheck(param.getThrowable().getCause(), null);
 				return null; //never reach.
 			} else {
 				// the exception cause by epic self, just log.
-				Logger.w(TAG, "epic cause exception in call bridge!!");
+				Logger.e(TAG, "epic cause exception in call bridge!!", throwable);
 			}
 			return null; // never reached.
 		} else {
