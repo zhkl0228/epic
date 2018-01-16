@@ -36,8 +36,16 @@ public class Target {
         return a.hashCode() + b;
     }
 
-    public int test2(int a, int b) {
-        return a * b + b * b;
+    public int returnConst(int a) {
+        return a;
+    }
+
+    public int add(int a, int b) {
+        return a + b;
+    }
+
+    public int plus(int a, int b) {
+        return a + b;
     }
 
     public int test3(Object a, int b) {
@@ -49,9 +57,6 @@ public class Target {
         return Integer.valueOf(a).hashCode();
     }
 
-    public static int add(int a, int b) {
-        return a + b;
-    }
 
     public static float add(int a, float b) {
         return a + b;

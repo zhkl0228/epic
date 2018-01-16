@@ -17,37 +17,55 @@
 
 package com.taobao.android.dexposed.utility;
 
+import android.util.Log;
+
 import java.lang.reflect.Method;
 
 import me.weishu.epic.art.method.ArtMethod;
 
 public class Runtime {
 
-    private static Boolean g64 = null;
+    private static final String TAG = "Runtime";
+
+    private volatile static Boolean isThumb = null;
+
+    private volatile static boolean g64 = false;
+    private volatile static boolean isArt = true;
+
+    static {
+        try {
+            g64 = (boolean) Class.forName("dalvik.system.VMRuntime").getDeclaredMethod("is64Bit").invoke(Class.forName("dalvik.system.VMRuntime").getDeclaredMethod("getRuntime").invoke(null));
+        } catch (Exception e) {
+            Log.e(TAG, "get is64Bit failed, default not 64bit!", e);
+            g64 = false;
+        }
+        isArt = System.getProperty("java.vm.version").startsWith("2");
+        Log.i(TAG, "is64Bit: " + g64 + ", isArt: " + isArt);
+    }
 
     public static boolean is64Bit() {
-        if (g64 == null)
-            try {
-                g64 = (Boolean) Class.forName("dalvik.system.VMRuntime").getDeclaredMethod("is64Bit").invoke(Class.forName("dalvik.system.VMRuntime").getDeclaredMethod("getRuntime").invoke(null));
-            } catch (Exception e) {
-                g64 = Boolean.FALSE;
-            }
         return g64;
     }
 
     public static boolean isArt() {
-        return System.getProperty("java.vm.version").startsWith("2");
+        return isArt;
     }
 
     public static boolean isThumb2() {
-        boolean isThumb2 = false;
-        try {
-            Method method = ArtMethod.class.getDeclaredMethod("of", Method.class);
-            ArtMethod artMethodStruct = ArtMethod.of(method);
-            isThumb2 = ((artMethodStruct.getEntryPointFromQuickCompiledCode() & 1) == 1);
-        } catch (Throwable e) {
-            e.printStackTrace();
+        if (isThumb != null) {
+            return isThumb;
         }
-        return isThumb2;
+
+        try {
+            Method method = String.class.getDeclaredMethod("hashCode");
+            ArtMethod artMethodStruct = ArtMethod.of(method);
+            long entryPointFromQuickCompiledCode = artMethodStruct.getEntryPointFromQuickCompiledCode();
+            Logger.w("Runtime", "isThumb2, entry: " + Long.toHexString(entryPointFromQuickCompiledCode));
+            isThumb = ((entryPointFromQuickCompiledCode & 1) == 1);
+            return isThumb;
+        } catch (Throwable e) {
+            Logger.w("Runtime", "isThumb2, error: " + e);
+            return true; // Default Thumb2.
+        }
     }
 }
